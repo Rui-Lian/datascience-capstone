@@ -171,6 +171,7 @@ plot(accu,
 ```
 
 ### 3.2 Exploratory analysis 2: term frequency analysis.
+  The most frequent words in the three sources are too common to convey any meaning. This is problematic because: 1) we need to put those words in model since they are the "backbone" of languange; 2) Including common words in the model is at the cost of system efficiency.  
 ```{r echo=FALSE, cache=TRUE}
 df1 %>% 
         arrange(desc(n)) %>% 
@@ -188,7 +189,7 @@ df1 %>%
 
 
 ### 3.3 Exploratory analysis 3: term frequency-inverse document frequency (tf-idf)analysis. 
-  Are there any differences from the three sources: twitter, news and blog? The common words in the corpus is too common to be meaningful. So we can't use a simple frequency model here. Term frequency-inverse document frequency (tf-idf) model could offset those "stop-words" and put more meaningful words on the table. (https://en.wikipedia.org/wiki/Tf%E2%80%93idf)
+  The common words in the corpus is too common to be meaningful. So we can't use a simple frequency model here. Term frequency-inverse document frequency (tf-idf) model could offset those "stop-words" and put more meaningful words on the table. (https://en.wikipedia.org/wiki/Tf%E2%80%93idf)
   Plot below: excluding common English "stop-words", we can see the top 15 words from the three sources are quite different. Many "atypical" English words were noted in twitter. 
   The take-homes here: 1) Need all of the three sources in training; 2) English is dynamic, some informal words are active in social media. 
 ```{r echo=FALSE, cache=TRUE, eval=TRUE}
@@ -214,7 +215,7 @@ tfidf %>%
 ```
   
 ### 3.4 Exploratory analysis 4: Document-frequency-matrix.   
-```{r echo=FALSE}
+```{r echo=FALSE, include=FALSE}
 # Create docoment frequency matrix by tidytext::cast_dfm. 
 mydfm <- df1 %>%
         cast_dfm(source, word, n)
