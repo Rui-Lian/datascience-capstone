@@ -1,0 +1,308 @@
+---
+title: "Untitled"
+author: "Lian Rui"
+date: "2018/9/19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Packages. 
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)# A set of hand-on packages from Rstudio. 
+library(quanteda)# Tokenization and create document frequency matrix.
+```
+
+# 2. Download and unzip files. 
+```{r}
+# Create file URL. 
+fileUrl <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+
+# Create the data file path. 
+dataPath <- paste(getwd(),"/raw.zip", sep = "")
+
+# Download the data. 
+download.file(fileUrl,
+              destfile = dataPath,
+              method = "curl")
+# Unzip the file. 
+unzip(dataPath)
+
+# List files in final/en_US folder. 
+files <- list.files("../capstone/final/en_US/")
+
+# Functions to have a glimpse each corpus: size, first line. 
+for (i in 1: 3) {
+        path <- paste(getwd(), "/final", "/en_US/", 
+                files[i], sep = "")
+        print(file.info(path)$size)
+        con <- file(path, "r")
+        print(readLines(con, 1))
+}
+```
+
+# 3. Reading and sampling 20% of each source. 
+```{r message=TRUE, warning=FALSE}
+# variable `raw` as the collection of three corpus.
+raw <- NULL 
+
+# loop and read 20% of the lines with `scan` function. 
+for (i in 1:3){
+        set.seed(38360) # set seed
+        # create file path
+        path <- paste(getwd(), "/final", "/en_US/", 
+                files[i], sep = "")
+        # create connection by path. 
+        con <- file(path, "r")
+        # scan and read data. skip lines with NULL. 
+        dat <- scan(con, what = "character", 
+                       sep = "\n", skipNul = TRUE)
+        # create random selection by rninom
+        select <- rbinom(length(dat), size = 1, prob = 0.2)
+        # subsetting each corpus. 
+        dat <- dat[select == 1]
+        # combine the sample to data frame raw
+        raw <- c(raw, dat)
+        # close the connection and loop again. 
+        close(con)
+}
+
+```
+
+# 5. Create document frequency matrix. 
+```{r}
+# create corpus. 
+corpus <- corpus(raw)
+
+# Total 854743 texts are in the corpus. 
+summary(corpus)
+
+
+# Create unigram document frequency matrix. 
+dfm1 <- dfm(corpus, what = "word", 
+            remove_numbers = TRUE, 
+            remove_punct = TRUE,
+            remove_symbols = TRUE, 
+            remove_separators = TRUE,
+            remove_twitter = TRUE, 
+            remove_hyphens = TRUE, 
+            remove_url = TRUE,
+            ngrams = 1L, skip = 0L)
+
+# Convert dfm1 to data frame. 
+dfm1 <- textstat_frequency(dfm1)
+# Filter unigram >= 5 instances. 
+dfm1 <- dfm1 %>%
+       filter(dfm1$frequency >=5)
+
+# Create 2gram document frequency matrix. 
+dfm2 <- dfm(corpus, what = "word", 
+            remove_numbers = TRUE, 
+            remove_punct = TRUE,
+            remove_symbols = TRUE, 
+            remove_separators = TRUE,
+            remove_twitter = TRUE, 
+            remove_hyphens = TRUE, 
+            remove_url = TRUE,
+            ngrams = 2L, skip = 0L)
+
+
+# Convert bigram dfm to data frame.
+dfm2 <- textstat_frequency(dfm2)
+# Filter bigram >= 5 instances. 
+dfm2 <- dfm2 %>%
+       filter(dfm2$frequency >=5)
+
+# Create 3gram document frequency matrix. 
+dfm3 <- dfm(corpus, what = "word", 
+            remove_numbers = TRUE, 
+            remove_punct = TRUE,
+            remove_symbols = TRUE, 
+            remove_separators = TRUE,
+            remove_twitter = TRUE, 
+            remove_hyphens = TRUE, 
+            remove_url = TRUE,
+            ngrams = 3L, skip = 0L)
+# Convert trigram dfm to data frame. 
+dfm3 <- textstat_frequency(dfm3)
+dfm3 <- dfm3 %>%
+       filter(dfm3$frequency >=5)
+
+```
+
+# trigram dataframe. 
+```{r}
+# word split of the trigram. 
+t <- str_split(dfm3$feature, pattern = "_*_", 
+               simplify = TRUE)
+
+colnames(t) <- c("w3", "w2", "w1")
+t <- as.data.frame(t)
+dfm3 <- cbind(t,dfm3$frequency)
+colnames(dfm3) <- c("w3", "w2", "w1", "freq")
+```
+
+# bigram dataframe. 
+```{r}
+# Words split of the bigram.
+t <- str_split(dfm2$feature, pattern = "_", 
+               simplify = TRUE)
+t <- t[, -3]
+colnames(t) <- c("w2", "w1")
+t <- as.data.frame(t)
+dfm2 <- cbind(t, dfm2$frequency)
+colnames(dfm2) <- c("w2", "w1", "freq")
+
+```
+
+# 1 gram
+```{r}
+# Unigram data frame.
+dfm1 <- dfm1 %>%
+        select(feature, frequency)
+colnames(dfm1) <- c("w1", "freq")
+
+```
+
+
+# 4 Removing the profanity words. 
+```{r}
+# Download the CMU "bad-words".
+## URL
+fileUrl <- "https://www.cs.cmu.edu/~biglou/resources/bad-words.txt"
+
+## Local file path.
+badwPath <- paste(getwd(),"/bad.txt", sep = "")
+
+## Download the data
+download.file(fileUrl,
+              destfile = badwPath,
+              method = "curl")
+
+## Read bad.text into R. 
+con <- file(badwPath, "r")
+bad <- scan(con, what = "character",sep = "\n")
+close(con) ## total 1383 bad words as string vector. 
+
+## Save badwords data. 
+saveRDS(bad, "badwords.rds")
+
+```
+
+
+
+```{r}
+# Read badwords data. 
+bad <- readRDS("badwords.rds")
+# Convert badwords vector to a string seperated by `|`. 
+bad <- paste(bad, collapse = "|")
+
+# Removing profanity words in unigram.
+dfm1 <- dfm1[grepl(dfm1$w1, pattern = bad) != TRUE, ]
+
+# Removing profanity words in bigram. 
+dfm2 <- dfm2[grepl(dfm2$w2, pattern = bad) == FALSE &
+                     grepl(dfm2$w1, pattern = bad) == FALSE, ]
+
+#Removing profanity words in trigram
+dfm3 <- dfm3[grepl(dfm3$w3, pattern = bad) == FALSE &
+                     grepl(dfm3$w2, pattern = bad) == FALSE &
+                     grepl(dfm3$w1, pattern = bad) == FALSE, ]
+
+```
+
+# Save the ngram data. 
+```{r}
+saveRDS(dfm1, "unigram.rds")
+saveRDS(dfm2, "bigram.rds")
+saveRDS(dfm3, "trigram.rds")
+```
+
+
+# Search function.  
+```{r}
+
+search_function <- function(x, ...){
+        x <- tolower(x) # lower case of the string. 
+        
+        x <- str_trim(x) # trim the whitespaces.  
+        
+        w_minus_2 <- paste0("^", word(x, -2), "$") # the second word in the string from the right. 
+        
+        w_minus_1 <- paste0("^", word(x, -1), "$") # the first word in the string from the right. 
+        
+        # Find trigrams that match the two words from the right of the input string. 
+        find_trigram <- str_detect(dfm3$w3, pattern = w_minus_2) & str_detect(dfm3$w2, pattern = w_minus_1)
+        
+        # find bigrams that match the first word of the input string from the right. 
+        find_bigram <- str_detect(dfm2$w2, pattern = w_minus_1) 
+        
+        # find unigrams that match the first words of the input string from the right. 
+        find_unigram <- str_detect(dfm1$w1, pattern = w_minus_1)
+        
+        if(isTRUE(sum(find_trigram) > 0)){ # words are matched in trigram. 
+                
+                t = dfm3[find_trigram, ]  #subset the trigram. 
+                
+                # calculate the score in stupid backoff model. 
+                ## numerator： the count of trigram starting with the two words to the total number of *trigrams*.  
+                ## denominator: the count of bigram with the two words to the total number of *bigrams*. 
+                t$score =  t[, 4]/sum(dfm2[find_bigram, ]$freq)
+
+                # create an output dataframe. 
+                ## next_word is the third word in the trigrams that match the first words. 
+                ## log_score is the log calculation of the score in stupid backoff. 
+                df <- data.frame(next_word = t$w1, log_score = log(t$score))
+                
+                #print the first 6 row of the prediction. 
+                print(head(df))
+                
+        }else{# If the first two words are not matched in the trigram. 
+                
+              if(isTRUE(sum(find_bigram) >0)){# detect if the last words in the string can be found in bigram. 
+                      
+                      t = dfm2[find_bigram, ] # Subset the bigram that start with the last words in input string. 
+                      
+                       # calculate the score in stupid backoff model.
+                      ## numerator： the proportion of bigrams starting with the last word to the total number of bigrams.
+                      ## denominator: the proportion of unigram with the last word to the total number of unigrams. 
+                      # 0.4 as the empirical discount in stupid backoff. 
+                      t$score = 0.4 * t[, 3]/sum(dfm1[find_unigram, ]$freq) 
+                              
+                      # create an output dataframe.
+                      ## next_word is the third word in the bigrams that match the first words.
+                      ## log_score is the log calculation of the score in stupid backoff. 
+                      df <- data.frame(next_word = t$w1, 
+                                       log_score = log(t$score))    
+                      
+                      print(head(df))
+                              
+              }else{# if the bigrams starting with the last word in the string are not found. 
+                              t = head(dfm1) # select the top words in unigram. 
+                              # calculate the score of the most common words
+                              # two recursive 0.4, i.e.,0.4^2 is the discount factor in stupid backoff. 
+                              t$score = 0.4^2 * t[, 2]/854743 # 854743 as the total number of corpus. 
+                              
+                              
+                              # create an output dataframe.
+                              ## next_word is the third word in the bigrams that match the first words.
+                              ## log_score is the log calculation of the score in stupid backoff. 
+                              df = data.frame(next_word = t$w1, 
+                                              log_score = log(t$score))
+                              
+                              print(head(df))
+
+              }
+        }
+}
+
+```
+
+
+```{r}
+search_function("happy to")
+```
+ 
+ 
